@@ -25,7 +25,7 @@ final class NullConnectorIngestionContractTest extends TestCase
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessageMatches('/ConnectorIngestionContract/');
 
-        (new NullConnectorIngestionContract())->dispatchIngestion(
+        (new NullConnectorIngestionContract)->dispatchIngestion(
             'project-key',
             'rel/path.md',
             'kb',
@@ -39,7 +39,7 @@ final class NullConnectorIngestionContractTest extends TestCase
     #[Test]
     public function resolve_kb_source_path_normalises_relative_form(): void
     {
-        $paths = (new NullConnectorIngestionContract())->resolveKbSourcePath('/foo\\bar/baz.md');
+        $paths = (new NullConnectorIngestionContract)->resolveKbSourcePath('/foo\\bar/baz.md');
         $this->assertSame('foo/bar/baz.md', $paths['relative']);
         $this->assertSame('foo/bar/baz.md', $paths['absolute']);
         $this->assertSame('kb', $paths['disk']);
@@ -48,23 +48,23 @@ final class NullConnectorIngestionContractTest extends TestCase
     #[Test]
     public function redact_content_is_no_op(): void
     {
-        $this->assertSame('hello', (new NullConnectorIngestionContract())->redactContent('hello'));
+        $this->assertSame('hello', (new NullConnectorIngestionContract)->redactContent('hello'));
     }
 
     #[Test]
     public function emit_audit_does_not_throw(): void
     {
-        (new NullConnectorIngestionContract())->emitAudit('notion', 'sync_completed', 1, ['k' => 'v']);
+        (new NullConnectorIngestionContract)->emitAudit('notion', 'sync_completed', 1, ['k' => 'v']);
         $this->addToAssertionCount(1);
     }
 
     #[Test]
     public function soft_delete_by_remote_id_returns_false(): void
     {
-        $installation = new ConnectorInstallation();
+        $installation = new ConnectorInstallation;
         $installation->tenant_id = 'default';
         $this->assertFalse(
-            (new NullConnectorIngestionContract())->softDeleteByRemoteId($installation, 'k', 'remote-id')
+            (new NullConnectorIngestionContract)->softDeleteByRemoteId($installation, 'k', 'remote-id')
         );
     }
 }

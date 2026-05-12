@@ -14,7 +14,7 @@ final class SourceAwareMetadataBuilderTest extends TestCase
     #[Test]
     public function build_emits_converter_hints_with_source_namespace_and_derived_block(): void
     {
-        $builder = new SourceAwareMetadataBuilder();
+        $builder = new SourceAwareMetadataBuilder;
         $meta = $builder->build(
             base: ['connector' => 'notion', 'installation_id' => 7],
             sourceKey: 'notion',
@@ -40,7 +40,7 @@ final class SourceAwareMetadataBuilderTest extends TestCase
     #[Test]
     public function status_active_null_degrades_to_false(): void
     {
-        $builder = new SourceAwareMetadataBuilder();
+        $builder = new SourceAwareMetadataBuilder;
         $meta = $builder->build(
             base: [],
             sourceKey: 'google_drive',
@@ -54,7 +54,7 @@ final class SourceAwareMetadataBuilderTest extends TestCase
     #[Test]
     public function tags_are_trimmed_and_deduplicated(): void
     {
-        $builder = new SourceAwareMetadataBuilder();
+        $builder = new SourceAwareMetadataBuilder;
         $meta = $builder->build(
             base: [],
             sourceKey: 'notion',

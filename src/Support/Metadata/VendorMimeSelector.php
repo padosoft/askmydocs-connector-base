@@ -15,18 +15,29 @@ namespace Padosoft\AskMyDocsConnectorBase\Support\Metadata;
  */
 final class VendorMimeSelector
 {
-    public const MIME_NOTION_PAGE       = 'application/vnd.notion.page+json';
-    public const MIME_NOTION_NOTE       = 'application/vnd.notion.note+json';
-    public const MIME_CONFLUENCE_PAGE   = 'application/vnd.confluence.page+json';
-    public const MIME_JIRA_ISSUE        = 'application/vnd.jira.issue+json';
-    public const MIME_EVERNOTE_NOTE     = 'application/vnd.evernote.note+xml';
-    public const MIME_FABRIC_NOTE       = 'application/vnd.fabric.note+json';
-    public const MIME_DRIVE_GDOC        = 'application/vnd.google-apps.document';
-    public const MIME_DRIVE_GSHEET      = 'application/vnd.google-apps.spreadsheet';
-    public const MIME_DRIVE_GSLIDE      = 'application/vnd.google-apps.presentation';
-    public const MIME_ONEDRIVE_OFFICE   = 'application/vnd.onedrive.office+json';
-    public const MIME_GENERIC_MARKDOWN  = 'text/markdown';
-    public const MIME_GENERIC_PDF       = 'application/pdf';
+    public const MIME_NOTION_PAGE = 'application/vnd.notion.page+json';
+
+    public const MIME_NOTION_NOTE = 'application/vnd.notion.note+json';
+
+    public const MIME_CONFLUENCE_PAGE = 'application/vnd.confluence.page+json';
+
+    public const MIME_JIRA_ISSUE = 'application/vnd.jira.issue+json';
+
+    public const MIME_EVERNOTE_NOTE = 'application/vnd.evernote.note+xml';
+
+    public const MIME_FABRIC_NOTE = 'application/vnd.fabric.note+json';
+
+    public const MIME_DRIVE_GDOC = 'application/vnd.google-apps.document';
+
+    public const MIME_DRIVE_GSHEET = 'application/vnd.google-apps.spreadsheet';
+
+    public const MIME_DRIVE_GSLIDE = 'application/vnd.google-apps.presentation';
+
+    public const MIME_ONEDRIVE_OFFICE = 'application/vnd.onedrive.office+json';
+
+    public const MIME_GENERIC_MARKDOWN = 'text/markdown';
+
+    public const MIME_GENERIC_PDF = 'application/pdf';
 
     /**
      * Google Drive MIME → source-aware vendor MIME. Falls back to plain
@@ -37,11 +48,11 @@ final class VendorMimeSelector
     public static function forGoogleDrive(?string $googleMimeType): string
     {
         return match ($googleMimeType) {
-            'application/vnd.google-apps.document'     => self::MIME_DRIVE_GDOC,
-            'application/vnd.google-apps.spreadsheet'  => self::MIME_DRIVE_GSHEET,
+            'application/vnd.google-apps.document' => self::MIME_DRIVE_GDOC,
+            'application/vnd.google-apps.spreadsheet' => self::MIME_DRIVE_GSHEET,
             'application/vnd.google-apps.presentation' => self::MIME_DRIVE_GSLIDE,
-            'application/pdf'                          => self::MIME_GENERIC_PDF,
-            default                                    => self::MIME_GENERIC_MARKDOWN,
+            'application/pdf' => self::MIME_GENERIC_PDF,
+            default => self::MIME_GENERIC_MARKDOWN,
         };
     }
 
@@ -60,6 +71,7 @@ final class VendorMimeSelector
         if (str_starts_with($contentType, 'application/vnd.openxmlformats-officedocument')) {
             return self::MIME_ONEDRIVE_OFFICE;
         }
+
         return match ($contentType) {
             'application/msword',
             'application/vnd.ms-excel',

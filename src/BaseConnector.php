@@ -48,6 +48,29 @@ abstract class BaseConnector implements ConnectorInterface
     ) {}
 
     /**
+     * @return list<string>
+     */
+    public function oauthScopes(): array
+    {
+        return [];
+    }
+
+    public function iconUrl(): string
+    {
+        return asset("connectors/{$this->key()}.svg");
+    }
+
+    /**
+     * Default no-op refresh. Override per-provider — e.g. Google's
+     * `https://oauth2.googleapis.com/token` POST with
+     * `grant_type=refresh_token`.
+     */
+    public function refreshTokenIfExpired(int $installationId): ?string
+    {
+        return $this->vault->getAccessToken($installationId);
+    }
+
+    /**
      * Proxy to the host's ingest pipeline. Connectors call this for
      * every document body they fetch — see
      * {@see ConnectorIngestionContract::dispatchIngestion()}.
@@ -120,29 +143,6 @@ abstract class BaseConnector implements ConnectorInterface
         string $remoteId,
     ): bool {
         return $this->ingestion->softDeleteByRemoteId($installation, $metadataKey, $remoteId);
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function oauthScopes(): array
-    {
-        return [];
-    }
-
-    public function iconUrl(): string
-    {
-        return asset("connectors/{$this->key()}.svg");
-    }
-
-    /**
-     * Default no-op refresh. Override per-provider — e.g. Google's
-     * `https://oauth2.googleapis.com/token` POST with
-     * `grant_type=refresh_token`.
-     */
-    public function refreshTokenIfExpired(int $installationId): ?string
-    {
-        return $this->vault->getAccessToken($installationId);
     }
 
     /**

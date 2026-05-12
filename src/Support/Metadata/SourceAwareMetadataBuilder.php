@@ -32,20 +32,20 @@ final class SourceAwareMetadataBuilder
 
     public function __construct(?RecencyBucketer $recency = null)
     {
-        $this->recency = $recency ?? new RecencyBucketer();
+        $this->recency = $recency ?? new RecencyBucketer;
     }
 
     /**
      * Build the full `metadata` array a connector passes to the host
      * ingest pipeline.
      *
-     * @param  array<string,mixed>  $base           Connector-level metadata (connector key, installation_id, ...).
-     * @param  string               $sourceKey      Per-source namespace key (e.g. 'notion', 'google_drive').
-     * @param  array<string,mixed>  $sourceFields   Raw vendor-shaped fields to publish under that namespace.
-     * @param  list<string>         $tags           Search tags lifted by the connector.
-     * @param  bool|null            $statusActive   Whether the source row is currently "active". Null degrades to false.
-     * @param  mixed                $lastModified   Source's last-modified timestamp (string/DateTimeInterface).
-     * @param  string|null          $owner          Single-owner email (or null when shared/unknown).
+     * @param  array<string,mixed>  $base  Connector-level metadata (connector key, installation_id, ...).
+     * @param  string  $sourceKey  Per-source namespace key (e.g. 'notion', 'google_drive').
+     * @param  array<string,mixed>  $sourceFields  Raw vendor-shaped fields to publish under that namespace.
+     * @param  list<string>  $tags  Search tags lifted by the connector.
+     * @param  bool|null  $statusActive  Whether the source row is currently "active". Null degrades to false.
+     * @param  mixed  $lastModified  Source's last-modified timestamp (string/DateTimeInterface).
+     * @param  string|null  $owner  Single-owner email (or null when shared/unknown).
      * @return array<string,mixed>
      */
     public function build(

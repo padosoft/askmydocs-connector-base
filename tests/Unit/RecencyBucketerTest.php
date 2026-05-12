@@ -12,12 +12,13 @@ use PHPUnit\Framework\Attributes\Test;
 final class RecencyBucketerTest extends TestCase
 {
     private RecencyBucketer $bucketer;
+
     private DateTimeImmutable $now;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->bucketer = new RecencyBucketer();
+        $this->bucketer = new RecencyBucketer;
         $this->now = new DateTimeImmutable('2026-05-12T00:00:00Z');
     }
 

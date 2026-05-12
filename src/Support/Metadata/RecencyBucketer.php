@@ -27,8 +27,11 @@ use DateTimeInterface;
 final class RecencyBucketer
 {
     public const BUCKET_WEEK = 'this_week';
+
     public const BUCKET_MONTH = 'this_month';
+
     public const BUCKET_QUARTER = 'this_quarter';
+
     public const BUCKET_OLDER = 'older';
 
     /** @var list<string> Full ordered domain — exposed for filter UIs. */

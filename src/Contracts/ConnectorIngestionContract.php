@@ -54,13 +54,13 @@ interface ConnectorIngestionContract
      * Hand the freshly-written document off to the host's ingest
      * pipeline. Typically dispatches a queued job.
      *
-     * @param  string  $projectKey     KB project / tenant bucket the doc belongs to.
-     * @param  string  $relativePath   UN-prefixed relative path on the KB disk.
-     * @param  string  $disk           Laravel filesystem disk name (matches `resolveKbSourcePath`'s output).
-     * @param  string  $title          Human-readable title (Notion page title, Drive file name, ...).
+     * @param  string  $projectKey  KB project / tenant bucket the doc belongs to.
+     * @param  string  $relativePath  UN-prefixed relative path on the KB disk.
+     * @param  string  $disk  Laravel filesystem disk name (matches `resolveKbSourcePath`'s output).
+     * @param  string  $title  Human-readable title (Notion page title, Drive file name, ...).
      * @param  array<string,mixed>  $metadata  Source-aware metadata bag (built via {@see Support\Metadata\SourceAwareMetadataBuilder}).
-     * @param  string  $mimeType       Effective MIME (potentially a synthetic vendor mime — see {@see Support\Metadata\VendorMimeSelector}).
-     * @param  string  $tenantId       The installation's tenant (R30 — explicit pass so the job can restore tenant context inside the worker).
+     * @param  string  $mimeType  Effective MIME (potentially a synthetic vendor mime — see {@see Support\Metadata\VendorMimeSelector}).
+     * @param  string  $tenantId  The installation's tenant (R30 — explicit pass so the job can restore tenant context inside the worker).
      */
     public function dispatchIngestion(
         string $projectKey,
@@ -96,8 +96,8 @@ interface ConnectorIngestionContract
      * event type is namespaced with `connector_` automatically by the
      * host implementation if not already prefixed.
      *
-     * @param  string  $connectorKey   {@see ConnectorInterface::key()}.
-     * @param  string  $eventType      One of `installed | sync_completed | sync_failed | disconnected | token_refreshed | …`.
+     * @param  string  $connectorKey  {@see ConnectorInterface::key()}.
+     * @param  string  $eventType  One of `installed | sync_completed | sync_failed | disconnected | token_refreshed | …`.
      * @param  int|null  $installationId  Defence-in-depth scoping.
      * @param  array<string,mixed>|null  $metadata  Free-form payload (mode, since, document counts, ...).
      */

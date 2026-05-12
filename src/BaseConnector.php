@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Padosoft\AskMyDocsConnectorBase\Auth\OAuthCredentialVault;
+use Padosoft\AskMyDocsConnectorBase\Contracts\ConnectorIngestionContract;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
 use Padosoft\AskMyDocsConnectorBase\Support\TenantContext;
 
@@ -43,7 +44,83 @@ abstract class BaseConnector implements ConnectorInterface
     public function __construct(
         protected readonly OAuthCredentialVault $vault,
         protected readonly TenantContext $tenantContext,
+        protected readonly ConnectorIngestionContract $ingestion,
     ) {}
+
+    /**
+     * Proxy to the host's ingest pipeline. Connectors call this for
+     * every document body they fetch — see
+     * {@see ConnectorIngestionContract::dispatchIngestion()}.
+     *
+     * @param  array<string,mixed>  $metadata
+     */
+    protected function dispatchIngestion(
+        string $projectKey,
+        string $relativePath,
+        string $disk,
+        string $title,
+        array $metadata,
+        string $mimeType,
+        string $tenantId,
+    ): void {
+        $this->ingestion->dispatchIngestion(
+            $projectKey,
+            $relativePath,
+            $disk,
+            $title,
+            $metadata,
+            $mimeType,
+            $tenantId,
+        );
+    }
+
+    /**
+     * Resolve a relative KB path to disk + absolute form.
+     *
+     * @return array{relative: string, absolute: string, disk: string}
+     */
+    protected function resolveKbSourcePath(string $relativePath): array
+    {
+        return $this->ingestion->resolveKbSourcePath($relativePath);
+    }
+
+    /**
+     * R26 — PII redaction at the ingest boundary. Connectors call this
+     * on every document body BEFORE handing it to the host pipeline.
+     */
+    protected function maybeRedactContent(string $content): string
+    {
+        return $this->ingestion->redactContent($content);
+    }
+
+    /**
+     * Emit an immutable audit row for the admin log viewer. The
+     * connector key is filled in from {@see ConnectorInterface::key()}.
+     *
+     * @param  array<string,mixed>|null  $metadata
+     */
+    protected function emitAudit(
+        string $eventType,
+        ?int $installationId = null,
+        ?array $metadata = null,
+    ): void {
+        $this->ingestion->emitAudit($this->key(), $eventType, $installationId, $metadata);
+    }
+
+    /**
+     * Route a provider-side deletion event to the host's deletion
+     * service. The connector stashes the remote-id under
+     * `knowledge_documents.metadata` at ingest time; on deletion the
+     * host looks it up tenant-scoped and soft-deletes the matching
+     * documents. Returns true when at least one row was acted upon.
+     */
+    protected function softDeleteByMetadataKey(
+        ConnectorInstallation $installation,
+        string $metadataKey,
+        string $remoteId,
+    ): bool {
+        return $this->ingestion->softDeleteByRemoteId($installation, $metadataKey, $remoteId);
+    }
 
     /**
      * @return list<string>

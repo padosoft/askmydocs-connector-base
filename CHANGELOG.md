@@ -4,6 +4,25 @@ All notable changes to `padosoft/askmydocs-connector-base` will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.1.0 — Ingestion contract + source-aware metadata helpers (2026-05-12)
+
+### Added
+
+- `Contracts\ConnectorIngestionContract` — inversion-of-control bridge between connector packages and the host's ingest pipeline. Five responsibilities: `dispatchIngestion()`, `resolveKbSourcePath()`, `redactContent()`, `emitAudit()`, `softDeleteByRemoteId()`. Per-connector OS packages (`padosoft/askmydocs-connector-notion`, `padosoft/askmydocs-connector-google-drive`, ...) call into this contract instead of host-specific classes — keeping them standalone-agnostic.
+- `Contracts\NullConnectorIngestionContract` — fail-loud default. Bound automatically by `ConnectorServiceProvider` when the host has not registered its own implementation. `dispatchIngestion()` throws `LogicException` with a descriptive message; `resolveKbSourcePath()` provides a sensible default for package tests; the remaining methods are safe no-ops.
+- `Support\Metadata\SourceAwareMetadataBuilder` — builds the rich-metadata envelope every connector hands to the host pipeline. Populates `metadata.converter_hints.<source>` with vendor-shaped fields + `metadata.converter_hints._derived` with normalised reranker-facing signals (search_tags, status_active, recency_bucket, owner). Flat-projects `_derived` at the top level for legacy readers.
+- `Support\Metadata\RecencyBucketer` — maps a `last_modified` timestamp to a coarse recency bucket (`this_week | this_month | this_quarter | older`). Stateless and deterministic. Future-dated input is treated as fresh; unparseable input falls back to `older`.
+- `Support\Metadata\VendorMimeSelector` — picks the synthetic vendor MIME that routes a connector-produced document to the right source-aware chunker on the host side. Constants for Notion / Drive / Confluence / Jira / Evernote / Fabric / OneDrive + Google-specific and OneDrive-specific selectors.
+- `BaseConnector` now constructor-injects a `ConnectorIngestionContract` and exposes proxy helpers (`dispatchIngestion`, `resolveKbSourcePath`, `maybeRedactContent`, `emitAudit`, `softDeleteByMetadataKey`) so concrete connectors stay host-agnostic while still getting the helper shape they had inside AskMyDocs.
+
+### Changed
+
+- `BaseConnector::__construct` now takes a third parameter (`ConnectorIngestionContract`). Existing subclasses constructed via the container pick the binding up automatically; manual `new` callers must update accordingly.
+
+### Notes
+
+- This release is fully backward-compatible at the `ConnectorInterface` level — concrete connectors that did NOT depend on the host helpers continue to work unchanged. The new helpers on `BaseConnector` are additive.
+
 ## v1.0.0 — Initial release (2026-05-12)
 
 Initial extraction from the AskMyDocs v4.5 inline connector framework into a standalone, reusable Laravel package.

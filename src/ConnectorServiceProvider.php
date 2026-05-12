@@ -6,6 +6,8 @@ namespace Padosoft\AskMyDocsConnectorBase;
 
 use Illuminate\Support\ServiceProvider;
 use Padosoft\AskMyDocsConnectorBase\Auth\OAuthCredentialVault;
+use Padosoft\AskMyDocsConnectorBase\Contracts\ConnectorIngestionContract;
+use Padosoft\AskMyDocsConnectorBase\Contracts\NullConnectorIngestionContract;
 use Padosoft\AskMyDocsConnectorBase\Support\TenantContext;
 
 /**
@@ -44,6 +46,17 @@ class ConnectorServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(OAuthCredentialVault::class);
+
+        // Fail-loud default for the ingestion bridge — host
+        // applications MUST rebind this to a real implementation that
+        // talks to their ingest pipeline. See
+        // {@see ConnectorIngestionContract} for the contract.
+        if (! $this->app->bound(ConnectorIngestionContract::class)) {
+            $this->app->singleton(
+                ConnectorIngestionContract::class,
+                NullConnectorIngestionContract::class,
+            );
+        }
 
         $this->app->singleton(ConnectorRegistry::class, function ($app) {
             return new ConnectorRegistry($app, (array) config('connectors', []));

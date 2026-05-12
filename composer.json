@@ -1,0 +1,62 @@
+{
+    "name": "padosoft/askmydocs-connector-base",
+    "description": "Framework primitives for AskMyDocs connectors — interface, base helpers, registry, OAuth vault, sync job, scheduler, exceptions. Extend ConnectorInterface to ingest any data source as RAG-ingestible knowledge.",
+    "type": "library",
+    "license": "Apache-2.0",
+    "keywords": [
+        "laravel",
+        "askmydocs",
+        "connectors",
+        "rag",
+        "oauth",
+        "knowledge-base",
+        "padosoft"
+    ],
+    "authors": [
+        {
+            "name": "Lorenzo Padovani",
+            "email": "lorenzo.padovani@padosoft.com"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/support": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/queue": "^12.0|^13.0",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/contracts": "^12.0|^13.0",
+        "nesbot/carbon": "^2.0|^3.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0|^12.0",
+        "orchestra/testbench": "^10.0|^11.0",
+        "mockery/mockery": "^1.6",
+        "phpstan/phpstan": "^2.0",
+        "laravel/pint": "^1.18"
+    },
+    "autoload": {
+        "psr-4": {
+            "Padosoft\\AskMyDocsConnectorBase\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Padosoft\\AskMyDocsConnectorBase\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Padosoft\\AskMyDocsConnectorBase\\ConnectorServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "format": "vendor/bin/pint"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

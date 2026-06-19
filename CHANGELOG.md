@@ -4,6 +4,17 @@ All notable changes to `padosoft/askmydocs-connector-base` will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.2.0 — Optional SupportsCredentialForm interface + CredentialField value object (2026-06-19)
+
+### Added
+
+- `Contracts\SupportsCredentialForm` — optional capability interface for credential-based connectors (IMAP, API-key, non-OAuth flows). A connector that implements this advertises to the AskMyDocs host that it can be configured via a native admin form instead of an OAuth redirect. The host detects it via `instanceof`, calls `credentialFormSchema()`, and routes submitted values to `config_json`, `auth_mode`, or the encrypted vault according to each field's `target`. Connectors that use only the OAuth redirect flow do NOT implement this interface — fully opt-in and backward compatible.
+- `Support\CredentialField` — immutable readonly value object describing a single form field (name, label, type, target, required, secret, default, options, showIf, help, group). `toArray()` returns a plain JSON-serialisable shape for the host. Secret fields (secret:true) are never stored in `config_json` — the host routes them through `handleOAuthCallback()` into the encrypted vault.
+
+### Notes
+
+- Fully backward compatible. Existing connectors that implement `ConnectorInterface` / extend `BaseConnector` are unaffected.
+
 ## v1.1.0 — Ingestion contract + source-aware metadata helpers (2026-05-12)
 
 ### Added

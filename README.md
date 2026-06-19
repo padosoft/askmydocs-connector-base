@@ -24,14 +24,15 @@
 4. [Installation](#installation)
 5. [Quick start — write your first connector in 50 lines](#quick-start--write-your-first-connector-in-50-lines)
 6. [The 10-method contract](#the-10-method-contract)
-7. [How auto-discovery works](#how-auto-discovery-works)
-8. [Credential vault — encrypted, atomic, tenant-scoped](#credential-vault--encrypted-atomic-tenant-scoped)
-9. [Scheduler + sync job](#scheduler--sync-job)
-10. [Multi-tenancy (R30 + R31)](#multi-tenancy-r30--r31)
-11. [Configuration reference](#configuration-reference)
-12. [Testing](#testing)
-13. [Roadmap](#roadmap)
-14. [License](#license)
+7. [Optional: credential form interface](#optional-credential-form-interface)
+8. [How auto-discovery works](#how-auto-discovery-works)
+9. [Credential vault — encrypted, atomic, tenant-scoped](#credential-vault--encrypted-atomic-tenant-scoped)
+10. [Scheduler + sync job](#scheduler--sync-job)
+11. [Multi-tenancy (R30 + R31)](#multi-tenancy-r30--r31)
+12. [Configuration reference](#configuration-reference)
+13. [Testing](#testing)
+14. [Roadmap](#roadmap)
+15. [License](#license)
 
 ---
 
@@ -68,6 +69,7 @@ This package is **the smallest possible surface** for shipping a new connector:
 | Exceptions | `ConnectorAuthException`, `ConnectorApiException`, `ConnectorPaginationLimitException`, `RegistryConfigurationException` | Distinct failure semantics: auth = no retry, api = retry, paginator-limit = partial success |
 | DTOs | `SyncResult`, `HealthStatus` | Immutable outcomes |
 | Tenancy | `Support\TenantContext` + `Models\Concerns\BelongsToTenant` | Request-scoped tenant, auto-fill on creating |
+| Credential form _(optional)_ | `Contracts\SupportsCredentialForm` + `Support\CredentialField` | Opt-in interface for credential-based connectors (IMAP, API key, …) — host renders a native admin form instead of OAuth redirect |
 
 ## Architecture at a glance
 
@@ -243,6 +245,57 @@ Every connector implements 10 methods (3 metadata + 1 scope + 2 OAuth + 2 sync +
 | `syncIncremental(int, ?Carbon): SyncResult` | Delta since `$since`. Falls back to `syncFull` when `$since === null`. Called by the cadence scheduler. | `ConnectorApiException` for transient (retry), `ConnectorAuthException` for credentials (no retry) |
 | `disconnect(int): void` | Clear credentials, optionally revoke at provider. | swallow / log; framework deletes installation row after |
 | `health(int): HealthStatus` | Fast (under 2s) side-effect-free probe. | returns `HealthStatus::errored(...)` instead of throwing |
+
+## Optional: credential form interface
+
+For connectors that use **credentials instead of OAuth** (IMAP, SMTP, API-key-based providers, ...), implement the optional `SupportsCredentialForm` interface alongside `ConnectorInterface`.
+
+The host detects the interface via `instanceof` at install time and renders a native admin form. Each field is described by a `CredentialField` value object — call `toArray()` on each to produce the JSON shape the host expects.
+
+```php
+use Padosoft\AskMyDocsConnectorBase\Contracts\SupportsCredentialForm;
+use Padosoft\AskMyDocsConnectorBase\Support\CredentialField;
+
+final class ImapConnector extends BaseConnector implements SupportsCredentialForm
+{
+    public function credentialFormSchema(): array
+    {
+        return [
+            (new CredentialField(
+                name: 'host', label: 'IMAP Host', type: 'text', target: 'connection', required: true,
+            ))->toArray(),
+            (new CredentialField(
+                name: 'port', label: 'Port', type: 'number', target: 'connection', required: true, default: 993,
+            ))->toArray(),
+            (new CredentialField(
+                name: 'username', label: 'Username', type: 'text', target: 'connection', required: true,
+            ))->toArray(),
+            (new CredentialField(
+                name: 'password', label: 'Password', type: 'password', target: 'secret',
+                required: true, secret: true,  // routed to vault, never stored in config_json
+            ))->toArray(),
+        ];
+    }
+}
+```
+
+**`CredentialField` properties:**
+
+| Property | Type | Description |
+|---|---|---|
+| `name` | `string` | Form-data key (e.g. `'host'`) |
+| `label` | `string` | Human-readable UI label |
+| `type` | `string` | `text` \| `number` \| `password` \| `select` \| `checkbox` |
+| `target` | `string` | `connection` \| `config` → `config_json`; `auth_mode`; `provider`; `secret` → vault |
+| `required` | `bool` | Whether the field must be filled |
+| `secret` | `bool` | Masked in UI; routed to vault, never `config_json` |
+| `default` | `mixed` | Pre-filled value |
+| `options` | `array<string,string>` | For `select`: `['value' => 'Label']` |
+| `showIf` | `array{field:string,equals:string}\|null` | Conditional display rule |
+| `help` | `string\|null` | Helper text rendered below the field |
+| `group` | `string\|null` | Optional UI section heading |
+
+Connectors that use only the standard **OAuth redirect** do **not** implement this interface — it is entirely opt-in and backward compatible.
 
 ## How auto-discovery works
 

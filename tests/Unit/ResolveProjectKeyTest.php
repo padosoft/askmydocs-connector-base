@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Padosoft\AskMyDocsConnectorBase\Tests\Unit;
 
 use Padosoft\AskMyDocsConnectorBase\Auth\OAuthCredentialVault;
+use Padosoft\AskMyDocsConnectorBase\BaseConnector;
 use Padosoft\AskMyDocsConnectorBase\Contracts\NullConnectorIngestionContract;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
 use Padosoft\AskMyDocsConnectorBase\Support\TenantContext;
@@ -12,7 +13,7 @@ use Padosoft\AskMyDocsConnectorBase\Tests\Support\FakeProjectKeyConnector;
 use Padosoft\AskMyDocsConnectorBase\Tests\TestCase;
 
 /**
- * {@see \Padosoft\AskMyDocsConnectorBase\BaseConnector::resolveProjectKey()}
+ * {@see BaseConnector::resolveProjectKey()}
  * is the single source of truth for the project a connector ingests
  * into: the installation's explicit `project_key`, falling back to the
  * host's `kb.ingest.default_project` config (itself defaulting to
@@ -21,15 +22,6 @@ use Padosoft\AskMyDocsConnectorBase\Tests\TestCase;
  */
 final class ResolveProjectKeyTest extends TestCase
 {
-    private function connector(): FakeProjectKeyConnector
-    {
-        return new FakeProjectKeyConnector(
-            $this->app->make(OAuthCredentialVault::class),
-            $this->app->make(TenantContext::class),
-            new NullConnectorIngestionContract(),
-        );
-    }
-
     public function test_returns_the_installations_project_key_when_set(): void
     {
         $installation = new ConnectorInstallation([
@@ -84,5 +76,14 @@ final class ResolveProjectKeyTest extends TestCase
         ]);
 
         $this->assertSame('tenant-wide', $this->connector()->exposeResolveProjectKey($installation));
+    }
+
+    private function connector(): FakeProjectKeyConnector
+    {
+        return new FakeProjectKeyConnector(
+            $this->app->make(OAuthCredentialVault::class),
+            $this->app->make(TenantContext::class),
+            new NullConnectorIngestionContract,
+        );
     }
 }

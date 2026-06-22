@@ -6,6 +6,7 @@ namespace Padosoft\AskMyDocsConnectorBase\Tests\Feature;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
 use Padosoft\AskMyDocsConnectorBase\Tests\TestCase;
@@ -116,6 +117,43 @@ final class MultiAccountInstallationTest extends TestCase
         $this->assertTrue(
             Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name_label')
         );
+    }
+
+    public function test_rerun_after_rollback_preserves_multi_account_rows(): void
+    {
+        // The hard case (Codex P2): a tenant has TWO accounts under
+        // distinct labels. A rollback drops `label`, collapsing both
+        // onto (acme, imap); the re-migrate re-defaults them to
+        // 'default'. up() must disambiguate before adding the relaxed
+        // unique instead of colliding — and lose no installation.
+        ConnectorInstallation::create([
+            'tenant_id' => 'acme',
+            'connector_name' => 'imap',
+            'label' => 'support',
+            'status' => ConnectorInstallation::STATUS_ACTIVE,
+        ]);
+        ConnectorInstallation::create([
+            'tenant_id' => 'acme',
+            'connector_name' => 'imap',
+            'label' => 'sales',
+            'status' => ConnectorInstallation::STATUS_ACTIVE,
+        ]);
+
+        $migration = require __DIR__.'/../../database/migrations/2026_06_22_000001_add_label_and_project_key_to_connector_installations.php';
+
+        $migration->down();
+        $migration->up();
+
+        // Both installations survive the cycle...
+        $this->assertSame(
+            2,
+            DB::table('connector_installations')->where('connector_name', 'imap')->count()
+        );
+        // ...and end up with distinct labels so the relaxed unique holds.
+        $labels = DB::table('connector_installations')
+            ->where('connector_name', 'imap')
+            ->pluck('label');
+        $this->assertSame(2, $labels->unique()->count());
     }
 
     public function test_same_label_allowed_across_two_tenants(): void

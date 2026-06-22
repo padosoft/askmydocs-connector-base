@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -58,6 +59,17 @@ return new class extends Migration
             });
         }
 
+        // Repair any duplicate (tenant_id, connector_name, label)
+        // tuples BEFORE creating the relaxed unique. A prior rollback
+        // dropped `label`, collapsing multi-account rows onto the same
+        // (tenant_id, connector_name); a re-`migrate` re-defaults them
+        // all to 'default', so the relaxed unique would collide. Suffix
+        // every row except the oldest in each colliding group with its
+        // id — NON-destructive: all installations survive, the operator
+        // can rename the de-duplicated labels afterwards. On a fresh /
+        // single-account DB there are no duplicates and this is a no-op.
+        $this->disambiguateDuplicateLabels();
+
         if (! Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name_label')) {
             Schema::table('connector_installations', function (Blueprint $table) {
                 $table->unique(
@@ -103,5 +115,37 @@ return new class extends Migration
         Schema::table('connector_installations', function (Blueprint $table) {
             $table->dropColumn(['label', 'project_key']);
         });
+    }
+
+    /**
+     * Suffix the label of every row except the oldest in each colliding
+     * (tenant_id, connector_name, label) group with its id, so the
+     * relaxed unique can be created without data loss. Idempotent and a
+     * no-op on a DB with no collisions. Portable GROUP BY ... HAVING
+     * across SQLite / Postgres / MySQL.
+     */
+    private function disambiguateDuplicateLabels(): void
+    {
+        $collidingGroups = DB::table('connector_installations')
+            ->select('tenant_id', 'connector_name', 'label')
+            ->groupBy('tenant_id', 'connector_name', 'label')
+            ->havingRaw('COUNT(*) > 1')
+            ->get();
+
+        foreach ($collidingGroups as $group) {
+            $ids = DB::table('connector_installations')
+                ->where('tenant_id', $group->tenant_id)
+                ->where('connector_name', $group->connector_name)
+                ->where('label', $group->label)
+                ->orderBy('id')
+                ->pluck('id');
+
+            // Keep the oldest (first) row's label as-is; disambiguate the rest.
+            foreach ($ids->slice(1) as $id) {
+                DB::table('connector_installations')
+                    ->where('id', $id)
+                    ->update(['label' => substr($group->label.'-'.$id, 0, 64)]);
+            }
+        }
     }
 };

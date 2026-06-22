@@ -13,8 +13,10 @@ use Padosoft\AskMyDocsConnectorBase\Support\TenantContext;
 /**
  * Connector installation row.
  *
- * Represents one (tenant_id, connector_name) tuple — e.g. "tenant
- * 'acme' has installed the google-drive connector". The companion
+ * Represents one (tenant_id, connector_name, label) installation —
+ * a tenant may install the same connector multiple times under
+ * distinct labels (e.g. "support" + "sales" IMAP mailboxes). The
+ * companion
  * {@see ConnectorCredential} carries the encrypted OAuth tokens; this
  * model carries the operational state (status, last_sync_at,
  * error_json, per-connector config).
@@ -28,6 +30,8 @@ use Padosoft\AskMyDocsConnectorBase\Support\TenantContext;
  * @property int $id
  * @property string $tenant_id
  * @property string $connector_name
+ * @property string $label Account discriminator within a connector (default 'default')
+ * @property string|null $project_key Optional KB project binding; null inherits the tenant default
  * @property array<string,mixed>|null $config_json
  * @property string $status One of pending|active|disabled|errored
  * @property Carbon|null $last_sync_at
@@ -60,6 +64,8 @@ class ConnectorInstallation extends Model
     protected $fillable = [
         'tenant_id',
         'connector_name',
+        'label',
+        'project_key',
         'config_json',
         'status',
         'last_sync_at',

@@ -32,30 +32,51 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Idempotent / re-runnable: because down() intentionally does
+        // NOT restore the original strict unique (see down()), a
+        // migrate → rollback → migrate cycle (common on redeploys)
+        // would otherwise hit an unconditional drop/add of a
+        // constraint that no longer exists and abort. Every step is
+        // guarded so up() converges to the same end-state from any
+        // partial start. hasColumn/hasIndex are portable across the
+        // SQLite test bench + Postgres + MySQL.
         Schema::table('connector_installations', function (Blueprint $table) {
-            $table->string('label', 64)->default('default');
-            $table->string('project_key', 120)->nullable();
+            if (! Schema::hasColumn('connector_installations', 'label')) {
+                $table->string('label', 64)->default('default');
+            }
+            if (! Schema::hasColumn('connector_installations', 'project_key')) {
+                $table->string('project_key', 120)->nullable();
+            }
         });
 
         // Drop the old (tenant_id, connector_name) unique in its own
         // statement — on SQLite this is a plain DROP INDEX, independent
-        // of the column additions above.
-        Schema::table('connector_installations', function (Blueprint $table) {
-            $table->dropUnique('uq_connector_installations_tenant_name');
-        });
+        // of the column additions above. Only if it is still present.
+        if (Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name')) {
+            Schema::table('connector_installations', function (Blueprint $table) {
+                $table->dropUnique('uq_connector_installations_tenant_name');
+            });
+        }
 
-        Schema::table('connector_installations', function (Blueprint $table) {
-            $table->unique(
-                ['tenant_id', 'connector_name', 'label'],
-                'uq_connector_installations_tenant_name_label'
-            );
-            // Tenant-scoped project filtering ("which accounts feed
-            // project X for this tenant") — composite, tenant-first.
-            $table->index(
-                ['tenant_id', 'project_key'],
-                'idx_connector_installations_tenant_project'
-            );
-        });
+        if (! Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name_label')) {
+            Schema::table('connector_installations', function (Blueprint $table) {
+                $table->unique(
+                    ['tenant_id', 'connector_name', 'label'],
+                    'uq_connector_installations_tenant_name_label'
+                );
+            });
+        }
+
+        if (! Schema::hasIndex('connector_installations', 'idx_connector_installations_tenant_project')) {
+            Schema::table('connector_installations', function (Blueprint $table) {
+                // Tenant-scoped project filtering ("which accounts feed
+                // project X for this tenant") — composite, tenant-first.
+                $table->index(
+                    ['tenant_id', 'project_key'],
+                    'idx_connector_installations_tenant_project'
+                );
+            });
+        }
     }
 
     /**

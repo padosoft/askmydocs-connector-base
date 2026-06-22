@@ -6,6 +6,7 @@ namespace Padosoft\AskMyDocsConnectorBase\Tests\Feature;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
 use Padosoft\AskMyDocsConnectorBase\Tests\TestCase;
 
@@ -96,6 +97,25 @@ final class MultiAccountInstallationTest extends TestCase
             'label' => 'support',
             'status' => ConnectorInstallation::STATUS_ACTIVE,
         ]);
+    }
+
+    public function test_migration_is_rerunnable_after_rollback(): void
+    {
+        // Simulate a redeploy cycle: the migration already ran (test
+        // bench setUp), now roll it back and re-run it. down() does NOT
+        // restore the strict (tenant_id, connector_name) unique, so an
+        // unguarded up() would try to drop a now-absent constraint and
+        // throw. The guarded up() must converge cleanly.
+        $migration = require __DIR__.'/../../database/migrations/2026_06_22_000001_add_label_and_project_key_to_connector_installations.php';
+
+        $migration->down();
+        $migration->up();
+
+        $this->assertTrue(Schema::hasColumn('connector_installations', 'label'));
+        $this->assertTrue(Schema::hasColumn('connector_installations', 'project_key'));
+        $this->assertTrue(
+            Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name_label')
+        );
     }
 
     public function test_same_label_allowed_across_two_tenants(): void

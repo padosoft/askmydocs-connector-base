@@ -39,30 +39,33 @@ return new class extends Migration
             ->orderBy('id')
             ->chunkById(100, function ($rows): void {
                 foreach ($rows as $row) {
-                    // Skip rows whose column already carries the binding.
-                    $column = $row->project_key ?? null;
-                    if (is_string($column) && $column !== '') {
-                        continue;
-                    }
-
                     $config = json_decode((string) ($row->config_json ?? ''), true);
-                    if (! is_array($config)) {
+                    if (! is_array($config) || ! array_key_exists('project_key', $config)) {
+                        // Nothing legacy to migrate or clean up.
                         continue;
                     }
 
-                    $legacy = $config['project_key'] ?? null;
-                    if (! is_string($legacy) || $legacy === '') {
-                        continue;
-                    }
+                    $legacy = $config['project_key'];
 
+                    // ALWAYS strip the legacy key so config_json can never
+                    // shadow the column after this migration — even when the
+                    // column is already set (e.g. an operator rebound it
+                    // between the v1.3 migration and this one). Leaving it
+                    // would block unbinding to the host default later.
                     unset($config['project_key']);
+
+                    $update = ['config_json' => json_encode($config)];
+
+                    // Adopt the legacy value into the column ONLY when the
+                    // column is still empty — never clobber an explicit binding.
+                    $column = $row->project_key ?? null;
+                    if ((! is_string($column) || $column === '') && is_string($legacy) && $legacy !== '') {
+                        $update['project_key'] = $legacy;
+                    }
 
                     DB::table('connector_installations')
                         ->where('id', $row->id)
-                        ->update([
-                            'project_key' => $legacy,
-                            'config_json' => json_encode($config),
-                        ]);
+                        ->update($update);
                 }
             });
     }

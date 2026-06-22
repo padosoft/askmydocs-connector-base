@@ -78,6 +78,37 @@ final class ResolveProjectKeyTest extends TestCase
         $this->assertSame('tenant-wide', $this->connector()->exposeResolveProjectKey($installation));
     }
 
+    public function test_falls_back_to_legacy_config_json_project_key_when_column_is_empty(): void
+    {
+        // Backward compat: installs created before the project_key column
+        // existed stored the binding in config_json. It must still win
+        // over the host default so they don't silently re-scope.
+        $this->app['config']->set('kb.ingest.default_project', 'tenant-wide');
+
+        $installation = new ConnectorInstallation([
+            'tenant_id' => 'acme',
+            'connector_name' => 'fake',
+            'label' => 'support',
+            'project_key' => null,
+            'config_json' => ['project_key' => 'legacy-proj'],
+        ]);
+
+        $this->assertSame('legacy-proj', $this->connector()->exposeResolveProjectKey($installation));
+    }
+
+    public function test_column_project_key_wins_over_legacy_config_json(): void
+    {
+        $installation = new ConnectorInstallation([
+            'tenant_id' => 'acme',
+            'connector_name' => 'fake',
+            'label' => 'support',
+            'project_key' => 'column-proj',
+            'config_json' => ['project_key' => 'legacy-proj'],
+        ]);
+
+        $this->assertSame('column-proj', $this->connector()->exposeResolveProjectKey($installation));
+    }
+
     private function connector(): FakeProjectKeyConnector
     {
         return new FakeProjectKeyConnector(

@@ -4,6 +4,19 @@ All notable changes to `padosoft/askmydocs-connector-base` will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.3.1 — Honour legacy config_json project_key in resolveProjectKey (2026-06-22)
+
+### Fixed
+
+- `BaseConnector::resolveProjectKey()` now falls back to a legacy
+  `config_json['project_key']` when the `project_key` column is empty,
+  before the host default. Installations created before the v1.3.0
+  `project_key` column existed stored the binding in `config_json`; the
+  column-only resolution introduced in v1.3.0 would have silently
+  re-scoped them to `kb.ingest.default_project`/`default` after upgrade.
+  Resolution order is now: column → `config_json['project_key']` →
+  `config('kb.ingest.default_project')` → `'default'`. Backward compatible.
+
 ## v1.3.0 — Multi-account + project-scoped installations (2026-06-22)
 
 ### Added

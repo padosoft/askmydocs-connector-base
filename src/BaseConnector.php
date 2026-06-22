@@ -100,12 +100,19 @@ abstract class BaseConnector implements ConnectorInterface
     /**
      * Single source of truth for the project a connector ingests into.
      *
-     * Returns the installation's explicit `project_key` when set,
-     * otherwise the host's `kb.ingest.default_project` config (itself
-     * defaulting to the literal `default`). This replaces the old
-     * `connector-<key>` synthetic-project fallback that was duplicated
-     * across all eight concrete connectors — they now call
-     * `$this->resolveProjectKey($installation)` instead.
+     * Resolution order:
+     *   1. the installation's explicit `project_key` column;
+     *   2. a legacy `config_json['project_key']` — installs created
+     *      before the column existed stored the binding there, and the
+     *      host hadn't backfilled it; honouring it keeps those installs
+     *      pointed at their configured project instead of silently
+     *      re-scoping to the default after upgrading (backward compat);
+     *   3. the host's `kb.ingest.default_project` config;
+     *   4. the literal `default`.
+     *
+     * This replaces the old `connector-<key>` synthetic-project fallback
+     * that was duplicated across all eight concrete connectors — they
+     * now call `$this->resolveProjectKey($installation)` instead.
      */
     protected function resolveProjectKey(ConnectorInstallation $installation): string
     {
@@ -113,6 +120,14 @@ abstract class BaseConnector implements ConnectorInterface
 
         if (is_string($projectKey) && $projectKey !== '') {
             return $projectKey;
+        }
+
+        // Legacy binding stored in config_json before the column existed.
+        $config = $installation->config_json;
+        $legacy = is_array($config) ? ($config['project_key'] ?? null) : null;
+
+        if (is_string($legacy) && $legacy !== '') {
+            return $legacy;
         }
 
         // The host MAY define kb.ingest.default_project; treat an

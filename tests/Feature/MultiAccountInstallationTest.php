@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Padosoft\AskMyDocsConnectorBase\Tests\Feature;
 
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -154,6 +155,38 @@ final class MultiAccountInstallationTest extends TestCase
             ->where('connector_name', 'imap')
             ->pluck('label');
         $this->assertSame(2, $labels->unique()->count());
+    }
+
+    public function test_disambiguation_preserves_the_id_suffix_at_the_column_limit(): void
+    {
+        // Edge case: two rows collide on a label already at the 64-char
+        // column limit. Stage the collision by dropping the unique and
+        // inserting the duplicate 64-char labels directly, then run up().
+        // The de-dup must truncate the BASE (not the suffix) so both rows
+        // end up distinct and the unique can be (re)created.
+        Schema::table('connector_installations', function (Blueprint $table) {
+            $table->dropUnique('uq_connector_installations_tenant_name_label');
+        });
+
+        $label64 = str_repeat('a', 64);
+        $now = '2026-06-22 00:00:00';
+        DB::table('connector_installations')->insert([
+            ['tenant_id' => 'acme', 'connector_name' => 'imap', 'label' => $label64, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['tenant_id' => 'acme', 'connector_name' => 'imap', 'label' => $label64, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+        ]);
+
+        $migration = require __DIR__.'/../../database/migrations/2026_06_22_000001_add_label_and_project_key_to_connector_installations.php';
+        $migration->up();
+
+        $labels = DB::table('connector_installations')
+            ->where('connector_name', 'imap')
+            ->pluck('label');
+
+        $this->assertSame(2, $labels->unique()->count());
+        $this->assertTrue($labels->every(fn ($l) => strlen($l) <= 64));
+        $this->assertTrue(
+            Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name_label')
+        );
     }
 
     public function test_same_label_allowed_across_two_tenants(): void

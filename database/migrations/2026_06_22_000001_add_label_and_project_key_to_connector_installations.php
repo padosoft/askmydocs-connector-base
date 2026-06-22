@@ -141,10 +141,18 @@ return new class extends Migration
                 ->pluck('id');
 
             // Keep the oldest (first) row's label as-is; disambiguate the rest.
+            // Reserve space for the full `-$id` suffix by truncating the BASE
+            // label first — truncating the concatenation instead would drop the
+            // suffix on a label already at the 64-char column limit and leave the
+            // duplicate in place (the unique creation would then still abort). The
+            // id is unique per row, so the suffixed label is guaranteed unique.
             foreach ($ids->slice(1) as $id) {
+                $suffix = '-'.$id;
+                $base = substr($group->label, 0, 64 - strlen($suffix));
+
                 DB::table('connector_installations')
                     ->where('id', $id)
-                    ->update(['label' => substr($group->label.'-'.$id, 0, 64)]);
+                    ->update(['label' => $base.$suffix]);
             }
         }
     }

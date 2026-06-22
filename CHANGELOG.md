@@ -16,6 +16,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   re-scoped them to `kb.ingest.default_project`/`default` after upgrade.
   Resolution order is now: column → `config_json['project_key']` →
   `config('kb.ingest.default_project')` → `'default'`. Backward compatible.
+- Backfill migration `2026_06_22_000002_backfill_project_key_from_config_json`
+  MOVES a non-empty legacy `config_json['project_key']` into the
+  `project_key` column (when the column is empty) and removes it from
+  `config_json`, so the column becomes the single source of truth — a
+  legacy install can then be unbound to the host default by clearing the
+  column alone. Idempotent, R3 memory-safe (chunkById), PHP-side JSON
+  (portable across SQLite/Postgres/MySQL).
 
 ## v1.3.0 — Multi-account + project-scoped installations (2026-06-22)
 

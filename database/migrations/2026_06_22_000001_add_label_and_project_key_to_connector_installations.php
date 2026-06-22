@@ -140,20 +140,54 @@ return new class extends Migration
                 ->orderBy('id')
                 ->pluck('id');
 
-            // Keep the oldest (first) row's label as-is; disambiguate the rest.
-            // Reserve space for the full `-$id` suffix by truncating the BASE
-            // label first — truncating the concatenation instead would drop the
-            // suffix on a label already at the 64-char column limit and leave the
-            // duplicate in place (the unique creation would then still abort). The
-            // id is unique per row, so the suffixed label is guaranteed unique.
+            // Keep the oldest (first) row's label as-is; disambiguate the rest
+            // with a label that is unique across the WHOLE (tenant, connector)
+            // scope — not merely within this group. A pre-existing row already
+            // holding the would-be `base-<id>` value would otherwise be
+            // re-collided with, and the unique creation would still abort.
             foreach ($ids->slice(1) as $id) {
-                $suffix = '-'.$id;
-                $base = substr($group->label, 0, 64 - strlen($suffix));
+                $newLabel = $this->uniqueLabelFor(
+                    $group->tenant_id,
+                    $group->connector_name,
+                    $group->label,
+                    $id,
+                );
 
                 DB::table('connector_installations')
                     ->where('id', $id)
-                    ->update(['label' => $base.$suffix]);
+                    ->update(['label' => $newLabel]);
             }
         }
+    }
+
+    /**
+     * Build a label derived from `$base` + the row id that is unique
+     * across every OTHER row of the same (tenant_id, connector_name),
+     * and fits the 64-char column. The id makes it unique within the
+     * colliding group; the bump counter resolves the rare case where the
+     * derived value already exists on an unrelated row. The base is
+     * truncated first so the disambiguating suffix is always preserved.
+     */
+    private function uniqueLabelFor(string $tenant, string $connector, string $base, int $id): string
+    {
+        $taken = DB::table('connector_installations')
+            ->where('tenant_id', $tenant)
+            ->where('connector_name', $connector)
+            ->where('id', '!=', $id)
+            ->pluck('label')
+            ->flip();
+
+        $build = static function (string $suffix) use ($base): string {
+            return substr($base, 0, max(0, 64 - strlen($suffix))).$suffix;
+        };
+
+        $candidate = $build('-'.$id);
+        $bump = 1;
+        while ($taken->has($candidate)) {
+            $candidate = $build('-'.$id.'-'.$bump);
+            $bump++;
+        }
+
+        return $candidate;
     }
 };

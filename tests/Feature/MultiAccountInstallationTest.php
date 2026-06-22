@@ -189,6 +189,38 @@ final class MultiAccountInstallationTest extends TestCase
         );
     }
 
+    public function test_disambiguation_avoids_a_preexisting_label_outside_the_group(): void
+    {
+        // Codex edge: two rows collide on 'foo' (ids 1,2) AND a separate
+        // row already holds 'foo-2' — the would-be suffix for id 2. The
+        // de-dup must skip the taken value (bump to 'foo-2-1') instead of
+        // re-colliding, so the unique can be (re)created.
+        Schema::table('connector_installations', function (Blueprint $table) {
+            $table->dropUnique('uq_connector_installations_tenant_name_label');
+        });
+
+        $now = '2026-06-22 00:00:00';
+        DB::table('connector_installations')->insert([
+            ['id' => 1, 'tenant_id' => 'acme', 'connector_name' => 'imap', 'label' => 'foo', 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 2, 'tenant_id' => 'acme', 'connector_name' => 'imap', 'label' => 'foo', 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => 3, 'tenant_id' => 'acme', 'connector_name' => 'imap', 'label' => 'foo-2', 'status' => 'active', 'created_at' => $now, 'updated_at' => $now],
+        ]);
+
+        $migration = require __DIR__.'/../../database/migrations/2026_06_22_000001_add_label_and_project_key_to_connector_installations.php';
+        $migration->up();
+
+        $labels = DB::table('connector_installations')
+            ->where('connector_name', 'imap')
+            ->orderBy('id')
+            ->pluck('label');
+
+        // All three labels distinct → the relaxed unique holds.
+        $this->assertSame(3, $labels->unique()->count());
+        $this->assertTrue(
+            Schema::hasIndex('connector_installations', 'uq_connector_installations_tenant_name_label')
+        );
+    }
+
     public function test_same_label_allowed_across_two_tenants(): void
     {
         ConnectorInstallation::create([

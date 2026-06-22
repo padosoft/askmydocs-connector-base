@@ -98,6 +98,32 @@ abstract class BaseConnector implements ConnectorInterface
     }
 
     /**
+     * Single source of truth for the project a connector ingests into.
+     *
+     * Returns the installation's explicit `project_key` when set,
+     * otherwise the host's `kb.ingest.default_project` config (itself
+     * defaulting to the literal `default`). This replaces the old
+     * `connector-<key>` synthetic-project fallback that was duplicated
+     * across all eight concrete connectors — they now call
+     * `$this->resolveProjectKey($installation)` instead.
+     */
+    protected function resolveProjectKey(ConnectorInstallation $installation): string
+    {
+        $projectKey = $installation->project_key;
+
+        if (is_string($projectKey) && $projectKey !== '') {
+            return $projectKey;
+        }
+
+        // The host MAY define kb.ingest.default_project; treat an
+        // absent / null / empty value as the literal 'default' so the
+        // connector never ingests into an empty project key.
+        $hostDefault = config('kb.ingest.default_project');
+
+        return is_string($hostDefault) && $hostDefault !== '' ? $hostDefault : 'default';
+    }
+
+    /**
      * Resolve a relative KB path to disk + absolute form.
      *
      * @return array{relative: string, absolute: string, disk: string}

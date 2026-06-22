@@ -4,6 +4,39 @@ All notable changes to `padosoft/askmydocs-connector-base` will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.3.0 — Multi-account + project-scoped installations (2026-06-22)
+
+### Added
+
+- **Multi-account installations.** `connector_installations` gains a `label`
+  column (string, default `'default'`) and the composite unique relaxes from
+  `(tenant_id, connector_name)` → `(tenant_id, connector_name, label)`. A
+  tenant can now connect MORE THAN ONE account per connector — e.g. two IMAP
+  mailboxes ("support", "sales"), several Drive/OneDrive accounts, multiple
+  Notion workspaces — each disambiguated by its `label`. The unique stays
+  tenant-first (R30/R31); two tenants may still share a label.
+- **Optional project binding.** `connector_installations.project_key` (string,
+  nullable, indexed via `(tenant_id, project_key)`) lets an operator bind an
+  account to a real KB project. Empty = inherit the tenant default.
+- **`BaseConnector::resolveProjectKey(ConnectorInstallation $i): string`** —
+  the single source of truth for the ingest project: the installation's
+  explicit `project_key`, else `config('kb.ingest.default_project')`, else the
+  literal `default`. Concrete connectors call `$this->resolveProjectKey($installation)`
+  instead of re-deriving a `connector-<key>` synthetic project.
+
+### Migration / upgrade notes
+
+- The new migration backfills `label='default'` on every existing row, so
+  prior single-account installations are preserved as the canonical default
+  account and the relaxed unique is satisfied automatically.
+- The migration `down()` drops the additive columns/index/unique but does NOT
+  restore the original strict `(tenant_id, connector_name)` unique: once
+  multi-account rows exist, re-tightening is impossible without data loss.
+  Deduplicate to one account per connector before re-adding it by hand if
+  needed.
+- Fully backward compatible for hosts that only ever create one installation
+  per connector.
+
 ## v1.2.0 — Optional SupportsCredentialForm interface + CredentialField value object (2026-06-19)
 
 ### Added

@@ -359,9 +359,22 @@ A read-modify-write without the lock loses siblings under contention. The packag
 Every model uses the `BelongsToTenant` trait:
 
 - **R31 (write-side)** — `tenant_id` auto-fills from `TenantContext::current()` on `creating` unless the caller passes an explicit value.
-- **R30 (read-side)** — `forTenant($id)` scope for explicit query scoping. Two tenants legitimately install the same connector under different `tenant_id`s — the composite UNIQUE `(tenant_id, connector_name)` makes the row pair structurally legal.
+- **R30 (read-side)** — `forTenant($id)` scope for explicit query scoping. Two tenants legitimately install the same connector under different `tenant_id`s — the composite UNIQUE `(tenant_id, connector_name, label)` makes the row pair structurally legal.
 
 Host applications with their own `TenantContext` rebind via a container alias — both surfaces observe the same active tenant.
+
+## Multi-account & project binding (v1.3+)
+
+A connector accepts **more than one installation per `(tenant_id, connector_name)`**, disambiguated by a `label` (e.g. `"support"`, `"sales"`) — connect two IMAP mailboxes, several Drive/OneDrive accounts, or multiple Notion workspaces side by side. The composite UNIQUE is `(tenant_id, connector_name, label)`; `label` defaults to `'default'` so pre-v1.3 single-account rows upgrade transparently.
+
+Each installation may bind to a real KB **`project_key`** (nullable column, indexed `(tenant_id, project_key)`). Resolve the effective project with the shared helper rather than re-deriving it per connector:
+
+```php
+// inside your connector's syncFull()/syncIncremental()
+$installation = $this->loadInstallation($installationId);
+$projectKey = $this->resolveProjectKey($installation);
+// → $installation->project_key, else config('kb.ingest.default_project'), else 'default'
+```
 
 ## Configuration reference
 

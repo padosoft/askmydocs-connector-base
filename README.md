@@ -70,6 +70,8 @@ This package is **the smallest possible surface** for shipping a new connector:
 | DTOs | `SyncResult`, `HealthStatus` | Immutable outcomes |
 | Tenancy | `Support\TenantContext` + `Models\Concerns\BelongsToTenant` | Request-scoped tenant, auto-fill on creating |
 | Credential form _(optional)_ | `Contracts\SupportsCredentialForm` + `Support\CredentialField` | Opt-in interface for credential-based connectors (IMAP, API key, …) — host renders a native admin form instead of OAuth redirect |
+| Folder discovery _(optional, v1.4)_ | `Contracts\SupportsFolderDiscovery` | Opt-in interface — `listAvailableFolders()` enumerates the live containers (IMAP folders, labels, spaces) an operator can whitelist; the connector owns auth + client lifecycle |
+| Connection settings _(optional, v1.4)_ | `Contracts\SupportsConnectionSettings` + `Support\CredentialField` | Opt-in interface — `connectionSettingsSchema()` declares the editable post-install sync knobs (window, folders, filters), rendered by the host as a generic settings editor |
 
 ## Architecture at a glance
 
@@ -285,17 +287,71 @@ final class ImapConnector extends BaseConnector implements SupportsCredentialFor
 |---|---|---|
 | `name` | `string` | Form-data key (e.g. `'host'`) |
 | `label` | `string` | Human-readable UI label |
-| `type` | `string` | `text` \| `number` \| `password` \| `select` \| `checkbox` |
+| `type` | `string` | `text` \| `number` \| `password` \| `select` \| `checkbox` \| `multiselect` _(v1.4)_ \| `tags` _(v1.4)_ |
 | `target` | `string` | `connection` \| `config` → `config_json`; `auth_mode`; `provider`; `secret` → vault |
 | `required` | `bool` | Whether the field must be filled |
 | `secret` | `bool` | Masked in UI; routed to vault, never `config_json` |
-| `default` | `mixed` | Pre-filled value |
-| `options` | `array<string,string>` | For `select`: `['value' => 'Label']` |
+| `default` | `mixed` | Pre-filled value (a list for `multiselect`/`tags`) |
+| `options` | `array<string,string>` | For `select`/`multiselect` with a fixed set: `['value' => 'Label']` |
 | `showIf` | `array{field:string,equals:string}\|null` | Conditional display rule |
 | `help` | `string\|null` | Helper text rendered below the field |
 | `group` | `string\|null` | Optional UI section heading |
+| `discovery` _(v1.4)_ | `string\|null` | For a live `multiselect`: names the discovery source (`'folders'` → `SupportsFolderDiscovery`) |
 
 Connectors that use only the standard **OAuth redirect** do **not** implement this interface — it is entirely opt-in and backward compatible.
+
+## Optional: folder discovery + editable settings (v1.4)
+
+A connector that has selectable containers (IMAP folders, Gmail labels, …) and tunable sync behaviour opts into two more capabilities. The host detects each via `instanceof` (R23 — no connector-name branch) and renders a **generic, schema-driven settings editor** seeded with the installation's current `config_json` — no bespoke per-connector form.
+
+```php
+use Padosoft\AskMyDocsConnectorBase\Contracts\SupportsConnectionSettings;
+use Padosoft\AskMyDocsConnectorBase\Contracts\SupportsFolderDiscovery;
+use Padosoft\AskMyDocsConnectorBase\Support\CredentialField;
+
+final class ImapConnector extends BaseConnector implements
+    SupportsCredentialForm,
+    SupportsFolderDiscovery,
+    SupportsConnectionSettings
+{
+    /** Live container list — the connector owns auth + client lifecycle. */
+    public function listAvailableFolders(int $installationId): array
+    {
+        $client = $this->makeClient($installationId);   // handles basic + xoauth2 token refresh
+        try {
+            return $client->listMailboxes();             // list<string>, verbatim
+        } finally {
+            $client->close();
+        }
+    }
+
+    /** Editable post-install sync knobs — every field target='config', never secret. */
+    public function connectionSettingsSchema(): array
+    {
+        return [
+            (new CredentialField(
+                name: 'folders.include', label: 'Folders to sync', type: 'multiselect',
+                target: 'config', default: [], group: 'Folders', discovery: 'folders',
+                help: 'Empty = sync every non-excluded folder.',
+            ))->toArray(),
+            (new CredentialField(
+                name: 'folders.exclude', label: 'Folders to skip', type: 'multiselect',
+                target: 'config', default: [], group: 'Folders', discovery: 'folders',
+            ))->toArray(),
+            (new CredentialField(
+                name: 'date_window_days', label: 'Sync window (days)', type: 'number',
+                target: 'config', default: 365, group: 'Sync window', help: '0 = all history.',
+            ))->toArray(),
+            (new CredentialField(
+                name: 'senders.exclude', label: 'Exclude senders', type: 'tags',
+                target: 'config', default: [], group: 'Filtering',
+            ))->toArray(),
+        ];
+    }
+}
+```
+
+The settings field `name` is a **dotted path** the host writes into `config_json` (`folders.include` → `config_json['folders']['include']`) — exactly what the connector reads back at sync time, so a picked value round-trips 1:1. Both capabilities are opt-in and backward compatible.
 
 ## How auto-discovery works
 

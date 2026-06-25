@@ -13,10 +13,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   container identifiers (IMAP folders, labels, spaces) an operator may
   whitelist/blacklist for sync. The connector owns the auth + client lifecycle
   (token refresh, connect, close) so the host never reconstructs the upstream
-  client. Read-only and side-effect-free; an unreachable source / rejected
-  credentials throw `ConnectorApiException` (host → 503), never a misleading
-  empty-but-successful list (R14). The host detects it via `instanceof`
-  (R23 — no connector-name branch).
+  client — which also means discovery MAY persist a credential refresh as part of
+  authenticating (it is otherwise read-only w.r.t. config and source content).
+  Failures follow the base taxonomy: an unreachable / transient source throws
+  `ConnectorApiException` (host → 503-class), while rejected credentials or a
+  failed token refresh throw `ConnectorAuthException` (operator must
+  re-authenticate) — never a misleading empty-but-successful list (R14). The host
+  detects the capability via `instanceof` (R23 — no connector-name branch).
 - **`Contracts\SupportsConnectionSettings`** — optional capability interface.
   `connectionSettingsSchema(): array` declares the EDITABLE post-install
   sync-behaviour knobs (sync window, folders include/exclude, sender/recipient/

@@ -39,8 +39,13 @@ interface SupportsFolderDiscovery
      * the values the connector's own sync filter whitelists/blacklists (so a
      * picked value round-trips 1:1 with config_json).
      *
-     * Read-only and side-effect-free: it MUST NOT mutate the installation, its
-     * credentials, or any upstream state. An empty list is a valid result (the
+     * Read-only with respect to the SOURCE and the operator's configuration: it
+     * MUST NOT mutate config_json, change upstream state, or ingest anything. It
+     * MAY persist a credential refresh performed as part of the connector-owned
+     * auth lifecycle (e.g. rotating an OAuth2 access/refresh token while
+     * connecting) — that is an internal side effect of authenticating, not a
+     * change to what the operator configured, and is exactly why discovery lives
+     * in the connector rather than the host. An empty list is a valid result (the
      * source genuinely has no containers) and MUST be distinguishable from a
      * failure — the latter throws.
      *

@@ -4,6 +4,53 @@ All notable changes to `padosoft/askmydocs-connector-base` will be documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.4.0 — Folder discovery + editable connection-settings capabilities (2026-06-25)
+
+### Added
+
+- **`Contracts\SupportsFolderDiscovery`** — optional capability interface.
+  `listAvailableFolders(int $installationId): array` returns the live, verbatim
+  container identifiers (IMAP folders, labels, spaces) an operator may
+  whitelist/blacklist for sync. The connector owns the auth + client lifecycle
+  (token refresh, connect, close) so the host never reconstructs the upstream
+  client — which also means discovery MAY persist a credential refresh as part of
+  authenticating (it is otherwise read-only w.r.t. config and source content).
+  Failures follow the base taxonomy: an unreachable / transient source throws
+  `ConnectorApiException` (host → 503-class), while rejected credentials or a
+  failed token refresh throw `ConnectorAuthException` (operator must
+  re-authenticate) — never a misleading empty-but-successful list (R14). The host
+  detects the capability via `instanceof` (R23 — no connector-name branch).
+- **`Contracts\SupportsConnectionSettings`** — optional capability interface.
+  `connectionSettingsSchema(): array` declares the EDITABLE post-install
+  sync-behaviour knobs (sync window, folders include/exclude, sender/recipient/
+  subject filters, body format, attachment limits, …) as a list of
+  `CredentialField::toArray()` shapes. Distinct from `SupportsCredentialForm`
+  (connect-time credentials): every field uses `target='config'` and is never
+  secret. The host renders them in a generic, schema-driven settings editor
+  seeded with the installation's current `config_json` — no bespoke per-connector
+  form. A field `name` is a dotted path written into `config_json`
+  (`folders.include` → `config_json['folders']['include']`), matching exactly what
+  the connector reads at sync time.
+- **`CredentialField`** gains two field types and one optional property:
+  - `type` now also accepts `multiselect` (a list chosen from a fixed or live
+    option set) and `tags` (an open-ended free-text string list). Both serialise
+    as a JSON array.
+  - new optional constructor argument `discovery: ?string = null` — for a live
+    `multiselect`, names the discovery source the host queries to populate the
+    choices (`'folders'` → `SupportsFolderDiscovery::listAvailableFolders()`).
+    Kept a free string (not an enum) so future sources (labels, spaces, drives)
+    need no base change.
+  - `toArray()` appends `'discovery'` as the 12th key. **Additive** — pre-v1.4
+    consumers that read by key are unaffected (it is simply `null` on every
+    legacy field).
+
+### Compatibility
+
+- Fully backward compatible. The new interfaces are opt-in; a connector that does
+  not implement them is unchanged. The `discovery` constructor argument is the
+  last parameter with a `null` default, so existing positional/named `CredentialField`
+  constructions are unaffected.
+
 ## v1.3.1 — Honour legacy config_json project_key in resolveProjectKey (2026-06-22)
 
 ### Fixed

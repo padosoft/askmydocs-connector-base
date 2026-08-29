@@ -54,7 +54,12 @@ final class SourceAccess
     public readonly array $principals;
 
     /**
-     * @param  array<array-key, SourcePrincipal>  $principals
+     * Deliberately typed loose: the guard below is the real contract, and a
+     * docblock promising SourcePrincipal elements would make it look
+     * redundant while callers -- ordinary untyped PHP in eleven connectors
+     * -- can still pass anything at runtime.
+     *
+     * @param  array<array-key, mixed>  $principals
      */
     public function __construct(
         array $principals = [],

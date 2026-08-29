@@ -71,7 +71,7 @@ This package is **the smallest possible surface** for shipping a new connector:
 | Tenancy | `Support\TenantContext` + `Models\Concerns\BelongsToTenant` | Request-scoped tenant, auto-fill on creating |
 | Credential form _(optional)_ | `Contracts\SupportsCredentialForm` + `Support\CredentialField` | Opt-in interface for credential-based connectors (IMAP, API key, …) — host renders a native admin form instead of OAuth redirect |
 | Folder discovery _(optional, v1.4)_ | `Contracts\SupportsFolderDiscovery` | Opt-in interface — `listAvailableFolders()` enumerates the live containers (IMAP folders, labels, spaces) an operator can whitelist; the connector owns auth + client lifecycle |
-| Provenance _(optional, v1.5)_ | `Contracts\DeclaresProvenance` + `ProvenanceTier` | Opt-in interface — `provenanceTier()` declares who authored the content this connector ingests, so the host can record it per document. Not a curation tier |
+| Provenance _(optional, v1.5)_ | `Contracts\DeclaresProvenance` + `ProvenanceTier` | Opt-in interface — `provenanceTier(int $installationId)` declares who authored the content this installation ingests, so the host can record it per document. Not a curation tier |
 | Connection settings _(optional, v1.4)_ | `Contracts\SupportsConnectionSettings` + `Support\CredentialField` | Opt-in interface — `connectionSettingsSchema()` declares the editable post-install sync knobs (window, folders, filters), rendered by the host as a generic settings editor |
 
 ## Architecture at a glance

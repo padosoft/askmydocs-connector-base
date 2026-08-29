@@ -47,10 +47,17 @@ final class SourceAccess
     public const METADATA_KEY = '_source_access';
 
     /**
-     * @param  list<SourcePrincipal>  $principals
+     * Always a list, never a map — see the constructor.
+     *
+     * @var list<SourcePrincipal>
+     */
+    public readonly array $principals;
+
+    /**
+     * @param  array<array-key, SourcePrincipal>  $principals
      */
     public function __construct(
-        public readonly array $principals = [],
+        array $principals = [],
         public readonly bool $inheritsFromParent = false,
         public readonly bool $complete = true,
     ) {
@@ -61,6 +68,14 @@ final class SourceAccess
                 );
             }
         }
+
+        // Reindexed on the way in, because keying by external id is the
+        // obvious thing for a connector to do and json_encode turns a map
+        // into an OBJECT. That object then fails the list check in
+        // fromArray() and decodes to unknown() — the permission list would
+        // silently degrade to "we could not find out" for no reason other
+        // than how the caller happened to build the array.
+        $this->principals = array_values($principals);
     }
 
     /**
@@ -164,11 +179,20 @@ final class SourceAccess
             }
         }
 
-        return new self(
-            $principals,
-            (bool) ($raw['inherits_from_parent'] ?? false),
-            (bool) ($raw['complete'] ?? false),
-        );
+        $inherits = $raw['inherits_from_parent'] ?? false;
+        $complete = $raw['complete'] ?? false;
+
+        // Strict on purpose: `(bool) 'false'` is TRUE, so a flag that
+        // survived a sloppy encode as the STRING "false" would decode to a
+        // COMPLETE empty list — "the source says nobody" — and a host acting
+        // on that would revoke access nobody asked it to revoke. The two
+        // flags decide whether the list is authoritative, so a value whose
+        // type we do not recognise is not a flag, it is a decode failure.
+        if (! is_bool($inherits) || ! is_bool($complete)) {
+            return self::unknown();
+        }
+
+        return new self($principals, $inherits, $complete);
     }
 
     /**

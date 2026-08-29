@@ -26,8 +26,17 @@ use Padosoft\AskMyDocsConnectorBase\Exceptions\ConnectorAuthException;
  *      mirrors the outcome onto the document.
  *
  * Opt-in and backward compatible: a connector that does not implement it
- * behaves exactly as it does today, and `dispatchIngestion()` keeps its
- * signature apart from one optional trailing argument.
+ * behaves exactly as it does today, and `dispatchIngestion()` is UNCHANGED —
+ * it takes no ACL argument and none is planned. The reported list travels
+ * inside `$metadata` under {@see SourceAccess::METADATA_KEY}, which
+ * {@see \Padosoft\AskMyDocsConnectorBase\BaseConnector::withSourceAccess()}
+ * writes for you, so no call site handles the key by hand.
+ *
+ * The parameter was tried first and reverted: PHP rejects an implementation
+ * declaring fewer parameters than its interface, so even an OPTIONAL trailing
+ * one is a breaking change for every HOST that implements the contract — it
+ * would fatal at class-declaration time on upgrade, before any of its own
+ * code ran. Connectors are callers and would have been fine; hosts are not.
  *
  * **The connector reports; it never decides.** Returning a principal is not
  * granting access — the host owns the mapping from an external identifier to

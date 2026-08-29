@@ -149,4 +149,61 @@ final class SourceAccessTest extends TestCase
         $this->assertNotInstanceOf(SupportsSourceAcl::class, $silent);
         $this->assertCount(1, $reads->readAcl('remote-1')->principals);
     }
+
+    public function test_principals_survive_json_as_a_list_even_when_keyed(): void
+    {
+        // Keying by external id is the obvious way to build the array and
+        // json_encode turns a map into an OBJECT, which fails the list check
+        // on the way back in. The permission list would then degrade to
+        // "we could not find out" purely because of how it was assembled.
+        $access = SourceAccess::of([
+            'alice@example.com' => SourcePrincipal::user('alice@example.com'),
+            'bob@example.com' => SourcePrincipal::user('bob@example.com'),
+        ]);
+
+        $this->assertSame([0, 1], array_keys($access->principals));
+
+        $roundTripped = SourceAccess::fromArray(
+            json_decode(json_encode($access->toArray()), true),
+        );
+
+        $this->assertNotNull($roundTripped);
+        $this->assertTrue($roundTripped->complete);
+        $this->assertCount(2, $roundTripped->principals);
+    }
+
+    public function test_a_non_boolean_flag_decodes_to_unknown_not_to_nobody(): void
+    {
+        // (bool) 'false' is TRUE. A flag that survived a sloppy encode as the
+        // string "false" would otherwise decode to a COMPLETE empty list --
+        // "the source says nobody may read this" -- and a host acting on that
+        // would revoke access nobody asked it to revoke.
+        foreach (['false', 0, 1, 'true', null] as $bad) {
+            $decoded = SourceAccess::fromArray([
+                'principals' => [],
+                'inherits_from_parent' => false,
+                'complete' => $bad,
+            ]);
+
+            $this->assertNotNull($decoded);
+            $this->assertFalse(
+                $decoded->complete,
+                sprintf('A %s complete flag must not be treated as authoritative.', get_debug_type($bad)),
+            );
+            $this->assertTrue($decoded->isEmpty(), 'Nothing to act on, rather than "nobody".');
+        }
+    }
+
+    public function test_real_booleans_still_decode_normally(): void
+    {
+        $decoded = SourceAccess::fromArray([
+            'principals' => [],
+            'inherits_from_parent' => true,
+            'complete' => true,
+        ]);
+
+        $this->assertNotNull($decoded);
+        $this->assertTrue($decoded->complete);
+        $this->assertTrue($decoded->inheritsFromParent);
+    }
 }

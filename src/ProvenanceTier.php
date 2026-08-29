@@ -67,12 +67,25 @@ enum ProvenanceTier: string
     }
 
     /**
-     * Resolve a stored value, falling back to the default for anything this
-     * version does not recognise.
+     * Resolve a stored value, never throwing.
      *
-     * A row written by a newer version of the package (or by hand) must not
-     * crash a reader. Callers that need to distinguish "absent" from
-     * "unrecognised" should use {@see tryFrom()} directly.
+     * The two failure modes are NOT the same and do not get the same answer:
+     *
+     *   - `null` means no tier was ever recorded — a connector that declares
+     *     nothing, or a row written before this column existed. That has a
+     *     known meaning, {@see default()}, and is the backward-compatible
+     *     reading of every pre-existing document.
+     *   - An unrecognised string means a tier this version does not
+     *     understand, typically written by a newer version during a mixed
+     *     deployment or after a rollback. Nothing can be assumed about it, so
+     *     it fails CLOSED to {@see UntrustedExternal} rather than being
+     *     quietly promoted to trusted. Resolving unknown to trusted would
+     *     invert the protection: a future tier meant to be MORE restrictive
+     *     would read as safe on the older node, and `isExternallyAuthored()`
+     *     would answer false for content nobody vouched for.
+     *
+     * Callers that must tell "absent" from "unrecognised" should check for
+     * null themselves and then use `tryFrom()`, which does not accept null.
      */
     public static function fromStorage(?string $value): self
     {
@@ -80,7 +93,7 @@ enum ProvenanceTier: string
             return self::default();
         }
 
-        return self::tryFrom($value) ?? self::default();
+        return self::tryFrom($value) ?? self::UntrustedExternal;
     }
 
     /**

@@ -26,23 +26,32 @@ use Padosoft\AskMyDocsConnectorBase\ProvenanceTier;
  * changes, and no third-party connector built on the public template breaks.
  *
  * The connector declares this, not the host, because only the connector knows
- * what it is reading from. Two installations of the same connector can even
+ * what it is reading from. Two installations of the same connector routinely
  * differ — an internal distribution list and a public contact address are the
- * same IMAP code against sources with opposite authorship models — which is
- * why the method receives nothing and is free to consult the connector's own
- * installation state if it needs to.
+ * same IMAP code against sources with opposite authorship models — so the tier
+ * is resolved PER INSTALLATION, exactly like
+ * {@see SupportsFolderDiscovery::listAvailableFolders()}. `ConnectorRegistry`
+ * keeps one connector instance per connector key, so an implementation has no
+ * other way to know which installation it is answering for; a zero-argument
+ * method would force ambient mutable state that is not set when the host
+ * resolves the tier later on the ingestion path.
  *
  * @see ProvenanceTier for why this is NOT a curation tier
  */
 interface DeclaresProvenance
 {
     /**
-     * The tier the content this connector ingests should be labelled with.
+     * The tier the content ingested by this installation should carry.
      *
      * MUST be side-effect free: it is called on the ingestion path, per
      * document, and must not perform network calls or mutate configuration.
      * A connector whose tier depends on installation configuration should
-     * read that configuration, not re-fetch it.
+     * read the stored configuration, not re-fetch it upstream.
+     *
+     * @param  int  $installationId  The `connector_installations` row being
+     *                               ingested for. Resolve it through the
+     *                               connector's own tenant-scoped lookup, as
+     *                               the other installation-scoped capabilities do.
      */
-    public function provenanceTier(): ProvenanceTier;
+    public function provenanceTier(int $installationId): ProvenanceTier;
 }

@@ -376,7 +376,7 @@ use Padosoft\AskMyDocsConnectorBase\ProvenanceTier;
 
 final class ImapConnector extends BaseConnector implements DeclaresProvenance
 {
-    public function provenanceTier(): ProvenanceTier
+    public function provenanceTier(int $installationId): ProvenanceTier
     {
         // A mailbox accepts mail from anyone who knows the address.
         return ProvenanceTier::UntrustedExternal;
@@ -392,9 +392,15 @@ final class ImapConnector extends BaseConnector implements DeclaresProvenance
 
 **The connector declares it, never the host.** Only the fetcher knows whether a
 mailbox is an internal distribution list or a public contact address; inferring
-it host-side would be a heuristic over a fact the connector already had. Two
-installations of the same connector can legitimately differ, which is why the
-method may consult the connector's own installation state.
+it host-side would be a heuristic over a fact the connector already had.
+
+**Resolved per installation**, exactly like `SupportsFolderDiscovery::listAvailableFolders()`.
+Two installations of one connector routinely differ - an internal distribution
+list and a public contact address are the same IMAP code against sources with
+opposite authorship models. `ConnectorRegistry` keeps one instance per connector
+key, so the installation id has to be an argument; a zero-argument method would
+force ambient mutable state that is not set when the host resolves the tier on
+the ingestion path.
 
 **Opt-in and backward compatible.** A connector that does not implement the
 interface keeps its exact current meaning: the host falls back to
@@ -411,9 +417,19 @@ for this?"*. Provenance answers *"who wrote it?"*. A page a human reviewed and
 accepted, summarising an external email, is fully curated **and** externally
 authored at once — collapsing the two loses the half that matters for trust.
 
-Reading a stored value is total: `ProvenanceTier::fromStorage($value)` falls back
-to the default for `null` and for anything an older version of this package does
-not recognise, so a row written by a newer one never crashes a reader.
+Reading a stored value never throws, and the two failure modes get **different**
+answers:
+
+- `null` is a known **absence** - no declaration, i.e. every document written
+  before this existed. It reads as `default()`.
+- an **unrecognised** string is a tier this version does not understand, written
+  by a newer one during a mixed deployment or after a rollback. It fails
+  **closed** to `UntrustedExternal`.
+
+Collapsing the second into the trusted default would invert the protection: a
+future tier meant to be *more* restrictive would read as safe on the older node,
+and `isExternallyAuthored()` would answer `false` for content nobody vouched
+for.
 
 The tier is a **label**. This release enforces nothing with it — that is the
 point: enforcement is testable only against a corpus that is already labelled.

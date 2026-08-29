@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Padosoft\AskMyDocsConnectorBase\Contracts;
 
+use Padosoft\AskMyDocsConnectorBase\Access\SourceAccess;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
 
 /**
@@ -33,6 +34,7 @@ final class NullConnectorIngestionContract implements ConnectorIngestionContract
         array $metadata,
         string $mimeType,
         string $tenantId,
+        ?SourceAccess $access = null,
     ): void {
         throw new \LogicException(
             'No ConnectorIngestionContract implementation bound. '

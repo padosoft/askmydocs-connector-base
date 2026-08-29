@@ -30,6 +30,23 @@ namespace Padosoft\AskMyDocsConnectorBase\Access;
 final class SourceAccess
 {
     /**
+     * The reserved key this DTO travels under inside ingestion metadata.
+     *
+     * It does NOT go on `dispatchIngestion()` as a parameter. Adding one to
+     * the interface — even an optional trailing one — is a breaking change
+     * for every HOST that implements the contract: PHP rejects an
+     * implementation with fewer parameters than the interface declares, so
+     * an application binding its own implementation would fatal on upgrade
+     * before a single line of its code ran. Connectors are callers and would
+     * have been fine; hosts are implementers and would not.
+     *
+     * `$metadata` is already the extension channel for exactly this kind of
+     * per-document fact, and using it keeps the contract additive in the way
+     * the rest of the framework is.
+     */
+    public const METADATA_KEY = '_source_access';
+
+    /**
      * @param  list<SourcePrincipal>  $principals
      */
     public function __construct(
@@ -94,12 +111,64 @@ final class SourceAccess
     }
 
     /**
-     * True when the host has nothing actionable: no principals, no
-     * inheritance to follow, and no claim that the list is complete.
+     * True when the host has nothing to act on.
+     *
+     * A COMPLETE empty allow-list is not empty in this sense: "the source
+     * says nobody may read this" is a fact, and a host skipping it would
+     * leave whatever permissions it mirrored last time in place — the
+     * document stays shared after the share was removed. That is the slow
+     * leak reconciliation exists to prevent, so only an incomplete list with
+     * nothing in it and nothing to inherit counts as empty.
      */
     public function isEmpty(): bool
     {
-        return $this->principals === [] && ! $this->inheritsFromParent;
+        return $this->principals === []
+            && ! $this->inheritsFromParent
+            && ! $this->complete;
+    }
+
+    /**
+     * Rebuild from the array form, for the trip through ingestion metadata.
+     *
+     * Unknown or malformed input yields {@see unknown()} rather than an empty
+     * allow-list: a host must never read a decoding failure as "the source
+     * says nobody", which would unshare a document on the strength of a bug.
+     *
+     * @param  array<string, mixed>|null  $raw
+     */
+    public static function fromArray(?array $raw): ?self
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        if (! is_array($raw['principals'] ?? null)) {
+            return self::unknown();
+        }
+
+        $principals = [];
+
+        foreach ($raw['principals'] as $entry) {
+            if (! is_array($entry) || ! is_string($entry['type'] ?? null)) {
+                return self::unknown();
+            }
+
+            try {
+                $principals[] = new SourcePrincipal(
+                    $entry['type'],
+                    (string) ($entry['external_id'] ?? ''),
+                    (string) ($entry['effect'] ?? SourcePrincipal::EFFECT_ALLOW),
+                );
+            } catch (\InvalidArgumentException) {
+                return self::unknown();
+            }
+        }
+
+        return new self(
+            $principals,
+            (bool) ($raw['inherits_from_parent'] ?? false),
+            (bool) ($raw['complete'] ?? false),
+        );
     }
 
     /**

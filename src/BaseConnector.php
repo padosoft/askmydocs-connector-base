@@ -7,6 +7,7 @@ namespace Padosoft\AskMyDocsConnectorBase;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Padosoft\AskMyDocsConnectorBase\Access\SourceAccess;
 use Padosoft\AskMyDocsConnectorBase\Auth\OAuthCredentialVault;
 use Padosoft\AskMyDocsConnectorBase\Contracts\ConnectorIngestionContract;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
@@ -68,6 +69,38 @@ abstract class BaseConnector implements ConnectorInterface
     public function refreshTokenIfExpired(int $installationId): ?string
     {
         return $this->vault->getAccessToken($installationId);
+    }
+
+    /**
+     * Attach what the source said about who may read an item to the metadata
+     * of the document being ingested.
+     *
+     * Connectors implementing {@see Contracts\SupportsSourceAcl} call this
+     * on their way to `dispatchIngestion()`:
+     *
+     *     $metadata = $this->withSourceAccess($metadata, $this->readAcl($id));
+     *
+     * A null $access leaves the metadata untouched, which is what every
+     * connector that does not read permissions produces today — and a host
+     * must read that absence as "not reported", never as "no permissions".
+     *
+     * The DTO travels as an array under a reserved key rather than as a new
+     * parameter on the ingestion contract: adding one, even optional and
+     * trailing, would fatal every host that implements that interface.
+     * See {@see SourceAccess::METADATA_KEY}.
+     *
+     * @param  array<string, mixed>  $metadata
+     * @return array<string, mixed>
+     */
+    protected function withSourceAccess(array $metadata, ?SourceAccess $access): array
+    {
+        if ($access === null) {
+            return $metadata;
+        }
+
+        $metadata[SourceAccess::METADATA_KEY] = $access->toArray();
+
+        return $metadata;
     }
 
     /**

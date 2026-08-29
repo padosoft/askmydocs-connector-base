@@ -72,6 +72,48 @@ final class SourceAccessTest extends TestCase
         $this->assertFalse($access->complete);
     }
 
+    public function test_a_complete_empty_list_is_actionable_not_empty(): void
+    {
+        // "The source says nobody may read this" is a fact, and a host that
+        // skipped it would leave last sync's permissions in place — the
+        // document stays shared after the share was removed. Only an
+        // incomplete list with nothing in it is nothing to act on.
+        $this->assertFalse(SourceAccess::of([])->isEmpty());
+        $this->assertTrue(SourceAccess::unknown()->isEmpty());
+    }
+
+    public function test_it_round_trips_through_metadata(): void
+    {
+        $original = SourceAccess::of(
+            [SourcePrincipal::user('alice@example.com'), SourcePrincipal::group('eng', SourcePrincipal::EFFECT_DENY)],
+            inheritsFromParent: true,
+        );
+
+        $restored = SourceAccess::fromArray($original->toArray());
+
+        $this->assertNotNull($restored);
+        $this->assertSame($original->toArray(), $restored->toArray());
+    }
+
+    public function test_absent_access_stays_absent(): void
+    {
+        // null means "not reported", which every connector that does not read
+        // permissions produces today. It must not become an empty list.
+        $this->assertNull(SourceAccess::fromArray(null));
+    }
+
+    public function test_malformed_input_decodes_to_unknown_not_to_nobody(): void
+    {
+        // A decoding failure must never read as "the source says nobody" —
+        // that would unshare a document on the strength of a bug.
+        foreach ([[], ['principals' => 'nope'], ['principals' => [['type' => 'wat']]], ['principals' => [['type' => 'user', 'external_id' => '']]]] as $raw) {
+            $decoded = SourceAccess::fromArray($raw);
+
+            $this->assertNotNull($decoded);
+            $this->assertFalse($decoded->complete, 'Malformed input must decode to unknown.');
+        }
+    }
+
     public function test_inherited_means_as_the_parent_says_not_nobody(): void
     {
         $access = SourceAccess::inherited();

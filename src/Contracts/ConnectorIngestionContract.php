@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Padosoft\AskMyDocsConnectorBase\Contracts;
 
-use Padosoft\AskMyDocsConnectorBase\Access\SourceAccess;
 use Padosoft\AskMyDocsConnectorBase\Models\ConnectorInstallation;
 
 /**
@@ -61,11 +60,6 @@ interface ConnectorIngestionContract
      * @param  string  $title  Human-readable title (Notion page title, Drive file name, ...).
      * @param  array<string,mixed>  $metadata  Source-aware metadata bag (built via {@see Support\Metadata\SourceAwareMetadataBuilder}).
      * @param  string  $mimeType  Effective MIME (potentially a synthetic vendor mime — see {@see Support\Metadata\VendorMimeSelector}).
-     * @param  ?SourceAccess  $access  What the source reported about who may
-     *                                 read this item, when the connector implements
-     *                                 {@see SupportsSourceAcl}. NULL means "not reported", which is
-     *                                 what every connector says today and what a host must treat as
-     *                                 "unchanged", never as "no permissions".
      * @param  string  $tenantId  The installation's tenant (R30 — explicit pass so the job can restore tenant context inside the worker).
      */
     public function dispatchIngestion(
@@ -76,7 +70,6 @@ interface ConnectorIngestionContract
         array $metadata,
         string $mimeType,
         string $tenantId,
-        ?SourceAccess $access = null,
     ): void;
 
     /**

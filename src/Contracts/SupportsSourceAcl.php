@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Padosoft\AskMyDocsConnectorBase\Contracts;
 
 use Padosoft\AskMyDocsConnectorBase\Access\SourceAccess;
+use Padosoft\AskMyDocsConnectorBase\BaseConnector;
 use Padosoft\AskMyDocsConnectorBase\Exceptions\ConnectorAuthException;
 
 /**
@@ -29,7 +30,7 @@ use Padosoft\AskMyDocsConnectorBase\Exceptions\ConnectorAuthException;
  * behaves exactly as it does today, and `dispatchIngestion()` is UNCHANGED —
  * it takes no ACL argument and none is planned. The reported list travels
  * inside `$metadata` under {@see SourceAccess::METADATA_KEY}, which
- * {@see \Padosoft\AskMyDocsConnectorBase\BaseConnector::withSourceAccess()}
+ * {@see BaseConnector::withSourceAccess()}
  * writes for you, so no call site handles the key by hand.
  *
  * The parameter was tried first and reverted: PHP rejects an implementation

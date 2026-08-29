@@ -71,6 +71,7 @@ This package is **the smallest possible surface** for shipping a new connector:
 | Tenancy | `Support\TenantContext` + `Models\Concerns\BelongsToTenant` | Request-scoped tenant, auto-fill on creating |
 | Credential form _(optional)_ | `Contracts\SupportsCredentialForm` + `Support\CredentialField` | Opt-in interface for credential-based connectors (IMAP, API key, …) — host renders a native admin form instead of OAuth redirect |
 | Folder discovery _(optional, v1.4)_ | `Contracts\SupportsFolderDiscovery` | Opt-in interface — `listAvailableFolders()` enumerates the live containers (IMAP folders, labels, spaces) an operator can whitelist; the connector owns auth + client lifecycle |
+| Provenance _(optional, v1.5)_ | `Contracts\DeclaresProvenance` + `ProvenanceTier` | Opt-in interface — `provenanceTier(int $installationId)` declares who authored the content this installation ingests, so the host can record it per document. Not a curation tier |
 | Connection settings _(optional, v1.4)_ | `Contracts\SupportsConnectionSettings` + `Support\CredentialField` | Opt-in interface — `connectionSettingsSchema()` declares the editable post-install sync knobs (window, folders, filters), rendered by the host as a generic settings editor |
 
 ## Architecture at a glance
@@ -352,6 +353,86 @@ final class ImapConnector extends BaseConnector implements
 ```
 
 The settings field `name` is a **dotted path** the host writes into `config_json` (`folders.include` → `config_json['folders']['include']`) — exactly what the connector reads back at sync time, so a picked value round-trips 1:1. Both capabilities are opt-in and backward compatible.
+
+## Optional: declaring provenance (v1.5)
+
+Ingestion records what a document *is* — its title, its path, its mime type — and
+nothing about where the authority of its text comes from. That gap is invisible
+until you notice the two very different things a connector can be doing:
+
+- a Drive or Confluence connector carries text **written inside the organisation**;
+- an IMAP connector carries text **written by anyone who can send an email**.
+
+Both become retrieval grounding, and on a platform that also exposes tools to an
+agent, the second is attacker-reachable text arriving in a tool-calling context.
+Storing them as the same fact means no deployment can answer *"how much of our
+corpus is externally authored?"* — let alone act on the answer.
+
+`DeclaresProvenance` closes that gap with a single method:
+
+```php
+use Padosoft\AskMyDocsConnectorBase\Contracts\DeclaresProvenance;
+use Padosoft\AskMyDocsConnectorBase\ProvenanceTier;
+
+final class ImapConnector extends BaseConnector implements DeclaresProvenance
+{
+    public function provenanceTier(int $installationId): ProvenanceTier
+    {
+        // A mailbox accepts mail from anyone who knows the address.
+        return ProvenanceTier::UntrustedExternal;
+    }
+}
+```
+
+| Tier | Value | Means |
+|---|---|---|
+| `TrustedInternal` | `trusted-internal` | Written inside the organisation, through a system it controls |
+| `UntrustedExternal` | `untrusted-external` | Written outside the organisation's control, or by an unverified author |
+| `MachineGenerated` | `machine-generated` | Produced by a model or automated process rather than a person |
+
+**The connector declares it, never the host.** Only the fetcher knows whether a
+mailbox is an internal distribution list or a public contact address; inferring
+it host-side would be a heuristic over a fact the connector already had.
+
+**Resolved per installation**, exactly like `SupportsFolderDiscovery::listAvailableFolders()`.
+Two installations of one connector routinely differ - an internal distribution
+list and a public contact address are the same IMAP code against sources with
+opposite authorship models. `ConnectorRegistry` keeps one instance per connector
+key, so the installation id has to be an argument; a zero-argument method would
+force ambient mutable state that is not set when the host resolves the tier on
+the ingestion path.
+
+**Opt-in and backward compatible.** A connector that does not implement the
+interface keeps its exact current meaning: the host falls back to
+`ProvenanceTier::default()` — `TrustedInternal`, the tier every pre-existing
+connector already carried in practice. The ingestion contract signature does not
+change, so nothing built on the public connector template breaks.
+
+The default is deliberately *not* the most cautious value. Defaulting to
+"untrusted" would relabel an entire existing corpus overnight and make the label
+mean nothing; external content is the exception a connector has to declare.
+
+**This is not a curation tier.** A curation ranking answers *"has a human vouched
+for this?"*. Provenance answers *"who wrote it?"*. A page a human reviewed and
+accepted, summarising an external email, is fully curated **and** externally
+authored at once — collapsing the two loses the half that matters for trust.
+
+Reading a stored value never throws, and the two failure modes get **different**
+answers:
+
+- `null` is a known **absence** - no declaration, i.e. every document written
+  before this existed. It reads as `default()`.
+- an **unrecognised** string is a tier this version does not understand, written
+  by a newer one during a mixed deployment or after a rollback. It fails
+  **closed** to `UntrustedExternal`.
+
+Collapsing the second into the trusted default would invert the protection: a
+future tier meant to be *more* restrictive would read as safe on the older node,
+and `isExternallyAuthored()` would answer `false` for content nobody vouched
+for.
+
+The tier is a **label**. This release enforces nothing with it — that is the
+point: enforcement is testable only against a corpus that is already labelled.
 
 ## How auto-discovery works
 
